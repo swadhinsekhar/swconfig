@@ -23,7 +23,7 @@
             ilog_error("[Fail] ["#expr"]");  					  \
 																  \
         } 														  \
-    }	
+    }
 
 void bsp_vlans_l2forward()
 {
@@ -50,27 +50,6 @@ void bsp_vlans_isolate()
 		rtk_vlan_set(vlan_id, &vlan_cfg);
 		rtk_vlan_portPvid_set(port, vlan_id, 0);
 	}
-
-	//system("ip link set dev eth0 up");
-	//system("ip link add link eth0 name wan0 type vlan id 100");
-	//system("ip link set wan0 address 52:9d:cf:61:b8:00");
-	//system("ip link set dev wan0 up");
-
-	/*
-	for (i = 0; i < 4; i++){
-		port = ports_out[i];
-		vlan_id = 100 + port;
-		sprintf(cmd, "vconfig add eth0 %d", vlan_id);
-		system(cmd);
-		sprintf(cmd, "ifconfig eth0.%d down", vlan_id);
-		system(cmd);
-		sprintf(cmd, "ifconfig eth0.%d hw ether 52:9d:cf:61:b8:%02x", vlan_id, i);
-		system(cmd);
-		sprintf(cmd, "ifconfig eth0.%d up", vlan_id);
-		system(cmd);
-	}
-	*/
-	
 }
 
 
@@ -161,15 +140,18 @@ void bsp_vlan_qinq_config()
 
 int bsp_l2table_show()
 {
-	rtk_uint32 address = 0;
-	rtk_l2_ucastAddr_t l2_data;
-	rtk_api_ret_t ret;
+	rtk_uint32          address = 0;
+	rtk_l2_ucastAddr_t  l2_data;
+	rtk_api_ret_t       ret;
 
-	while (1){
-		if ((ret = rtk_l2_addr_next_get(READMETHOD_NEXT_L2UC, UTP_PORT0, &address, &l2_data))){
+	while (1) {
+	    if ((ret = rtk_l2_addr_next_get(READMETHOD_NEXT_L2UC,
+                    UTP_PORT0, &address, &l2_data))) {
 			break;
 		}
-		printf(PX_MAC" %d %d %d\n", PS_MAC(&(l2_data.mac)), l2_data.ivl, l2_data.cvid, l2_data.port);
+		printf(PX_MAC" %d %d %d\n",
+            PS_MAC(&(l2_data.mac)), l2_data.ivl,
+            l2_data.cvid, l2_data.port);
 		address++;
 	}
 }
@@ -190,7 +172,7 @@ int bsp_l2table_clear()
 	}
 }
 
-void bsp_ports_info()
+void bsp_ports_status()
 {
 	int i = 0;
 	rtk_port_linkStatus_t linkStatus;
@@ -202,14 +184,63 @@ void bsp_ports_info()
 
 	rtk_port_t ports[5] = { UTP_PORT0, UTP_PORT1, UTP_PORT2, UTP_PORT3, EXT_PORT0};
 
-	for (i = 0; i < 4; i++){
+	for (i = 0; i < 4; i++) {
 		rtk_port_phyStatus_get(ports[i], &linkStatus, &speed, &duplex);
-		ilog_info("[Port%d] %s   %s   %s", ports[i], linkStatus_str[linkStatus], speed_str[speed], duplex_str[duplex]);
+		ilog_info("[port%d] %s   %s   %s",
+            ports[i], linkStatus_str[linkStatus],
+            speed_str[speed], duplex_str[duplex]);
 	}
+}
+
+static const char *rtk_port_str[4] = {
+    "port0",
+    "port1",
+    "port2",
+    "port3"
+};
+
+rtk_port_t get_swport(char *swport)
+{
+    int i;
+
+    for(i=0; i<4; i++) {
+        if(!strcmp(rtk_port_str[i], swport)) {
+            return i;
+        }
+    }
+
+    return RTK_PORT_MAX;
+}
+
+void bsp_switch_ports_status(char *swport)
+{
+	int i = 0;
+	rtk_port_linkStatus_t linkStatus;
+	rtk_port_speed_t speed;
+	rtk_port_duplex_t duplex;
+	char *linkStatus_str[] = { "DOWN", "  UP" };
+	char *speed_str[] = { "  10M", " 100M", "1000M" };
+	char *duplex_str[] = { "HALF_DUPLEX ", "FULL_DUPLEX" };
+
+	rtk_port_t ports = get_swport(swport);
+    if(RTK_PORT_MAX != ports) {
+		rtk_port_phyStatus_get(ports, &linkStatus, &speed, &duplex);
+		ilog_info("[%s] %s   %s   %s",
+            swport, linkStatus_str[linkStatus],
+            speed_str[speed], duplex_str[duplex]);
+    } else {
+        printf("Invalid switch ports : %s\n", swport);
+    }
+}
+
+void bsp_ports_info()
+{
+	int         i = 0;
+	rtk_port_t  ports[5] = { UTP_PORT0, UTP_PORT1, UTP_PORT2, UTP_PORT3, EXT_PORT0};
 
 	ilog_info("-------------------------------------------------------------");
-	ilog_info("port Octets   UcastPkts MulticastPkts BroadcastPkts");
-	for (i = 0; i < 5; i++){
+	ilog_info("port   TX/RX     Octets      UcastPkts   MulticastPkts   BroadcastPkts");
+	for (i = 0; i < 4; i++) {
 		rtk_stat_counter_t InOctets;;
 		rtk_stat_counter_t InUcastPkts;
 		rtk_stat_counter_t InMulticastPkts;
@@ -218,24 +249,21 @@ void bsp_ports_info()
 		rtk_stat_counter_t OutUcastPkts;
 		rtk_stat_counter_t OutMulticastPkts;
 		rtk_stat_counter_t OutBroadcastPkts;
+
 		rtk_stat_port_get(ports[i], ifInOctets, &InOctets);
 		rtk_stat_port_get(ports[i], ifInUcastPkts, &InUcastPkts);
 		rtk_stat_port_get(ports[i], ifInMulticastPkts, &InMulticastPkts);
 		rtk_stat_port_get(ports[i], ifInBroadcastPkts, &InBroadcastPkts);
-		//rtk_stat_port_get(ports[i], ifOutOctets, &OutOctets);
-		//rtk_stat_port_get(ports[i], ifOutUcastPkts, &OutUcastPkts);
-		//rtk_stat_port_get(ports[i], ifOutMulticastPkts, &OutMulticastPkts);
-		//rtk_stat_port_get(ports[i], ifOutBroadcastPkts, &OutBroadcastPkts);
-		ilog_info("[Port%d] Rx %12llu %12llu %12llu %12llu", ports[i],
+		ilog_info("[port%d] Rx %12llu %12llu %12llu %12llu", ports[i],
 			InOctets, InUcastPkts, InMulticastPkts, InBroadcastPkts);
-		//ilog_info("[Port%d] Tx %12llu %12llu %12llu %12llu", ports[i],
-		//	OutOctets, OutUcastPkts, OutMulticastPkts, OutBroadcastPkts);
+
+		rtk_stat_port_get(ports[i], ifOutOctets, &OutOctets);
+		rtk_stat_port_get(ports[i], ifOutUcastPkts, &OutUcastPkts);
+		rtk_stat_port_get(ports[i], ifOutMulticastPkts, &OutMulticastPkts);
+		rtk_stat_port_get(ports[i], ifOutBroadcastPkts, &OutBroadcastPkts);
+		ilog_info("[Port%d] Tx %12llu %12llu %12llu %12llu", ports[i],
+			OutOctets, OutUcastPkts, OutMulticastPkts, OutBroadcastPkts);
 	}
-
-	
-
-
-
 }
 
 void bsp_info()
@@ -248,8 +276,12 @@ void bsp_info()
 
 void help()
 {
-	ilog_info("isolate");
-	ilog_info("l2forward");
+	//ilog_info("isolate");
+	//ilog_info("l2forward");
+	ilog_info("isolate2");
+	ilog_info("port-status");
+	ilog_info("port-status portX");
+	ilog_info("arp-show");
 	ilog_info("info");
 }
 
@@ -260,35 +292,48 @@ int main(int argc, char **argv)
 
 	rtk_switch_init();
 	rtk_l2_init();
-	if (argc == 2){
+
+	if (argc == 2) {
 		char * cmd = argv[1];
 
-		if (strcmp(cmd, "help") == 0){
+		if (strcmp(cmd, "help") == 0) {
 			help();
-		}else if (strcmp(cmd, "isolate") == 0){
-			bsp_vlans_isolate();
-		}else if (strcmp(cmd, "isolate2") == 0){
+		} else if (strcmp(cmd, "isolate") == 0) {
+			//bsp_vlans_isolate();
+            ;
+		} else if (strcmp(cmd, "isolate2") == 0) {
 			bsp_vlan_qinq_config();
-		}else if (strcmp(cmd, "l2forward") == 0){
-			bsp_vlans_l2forward();
-		}else if (strcmp(cmd, "info") == 0){
+		} else if (strcmp(cmd, "l2forward") == 0) {
+			//bsp_vlans_l2forward();
+            ;
+		} else if (strcmp(cmd, "port-status") == 0) {
+            bsp_ports_status();
+		} else if (strcmp(cmd, "arp-show") == 0) {
+			bsp_l2table_show();
+		} else if (strcmp(cmd, "info") == 0) {
 			bsp_info();
 			bsp_ports_info();
-			bsp_l2table_show();
-		}else{
+		} else {
 			help();
 		}
 
 		return 0;
 	}
 
-	
+    if (argc == 3) {
+		char *cmd1 = argv[1];
+		char *cmd2 = argv[2];
+
+        if((NULL != cmd1) && (NULL != cmd2)) {
+            printf("argv[1] : %s argv[2] : %s\n", argv[1], argv[2]);
+		    if (!strcmp(cmd1, "port-status")) {
+                bsp_switch_ports_status(cmd2);
+                return 0;
+            }
+        }
+    }
 
 	help();
-	icall_shell(argv[0], NULL);
-	while (1) {
-		sleep(1);
-	}
 	return 0;
 }
 
