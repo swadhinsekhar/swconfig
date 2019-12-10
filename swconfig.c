@@ -1,0 +1,294 @@
+#include <rtk_error.h>
+#include <rtk_types.h>
+#include <port.h>
+#include <rtk_switch.h>
+#include <smi.h>
+#include <stat.h>
+#include <vlan.h>
+#include <svlan.h>
+#include <rtl8367c_asicdrv_mib.h>
+#include <stdlib.h>
+#include <string.h>
+#include <l2.h>
+#include "iutil.h"
+#include "assert.h"
+#include "icall.h"
+
+
+#define EX_D(expr)												  \
+    {    														  \
+        if (!(expr)) {											  \
+            ilog_info("[ OK ] ["#expr"]");					      \
+        } else { 												  \
+            ilog_error("[Fail] ["#expr"]");  					  \
+																  \
+        } 														  \
+    }	
+
+void bsp_vlans_l2forward()
+{
+	rtk_vlan_init();
+}
+
+void bsp_vlans_isolate()
+{
+	rtk_vlan_init();
+	int i = 0;
+	rtk_vlan_cfg_t vlan_cfg;
+	rtk_vlan_t vlan_id;
+	rtk_port_t port;
+	char cmd[256];
+	rtk_port_t ports_out[2] = { UTP_PORT0, UTP_PORT2};
+	for (i = 0; i < 2; i++){
+		port = ports_out[i];
+		vlan_id = 100 + port;
+		memset(&vlan_cfg, 0x00, sizeof(rtk_vlan_cfg_t));
+		RTK_PORTMASK_PORT_SET(vlan_cfg.mbr, port);
+		RTK_PORTMASK_PORT_SET(vlan_cfg.mbr, UTP_PORT1);
+		RTK_PORTMASK_PORT_SET(vlan_cfg.untag, port);
+		vlan_cfg.ivl_en = 1;
+		rtk_vlan_set(vlan_id, &vlan_cfg);
+		rtk_vlan_portPvid_set(port, vlan_id, 0);
+	}
+
+	//system("ip link set dev eth0 up");
+	//system("ip link add link eth0 name wan0 type vlan id 100");
+	//system("ip link set wan0 address 52:9d:cf:61:b8:00");
+	//system("ip link set dev wan0 up");
+
+	/*
+	for (i = 0; i < 4; i++){
+		port = ports_out[i];
+		vlan_id = 100 + port;
+		sprintf(cmd, "vconfig add eth0 %d", vlan_id);
+		system(cmd);
+		sprintf(cmd, "ifconfig eth0.%d down", vlan_id);
+		system(cmd);
+		sprintf(cmd, "ifconfig eth0.%d hw ether 52:9d:cf:61:b8:%02x", vlan_id, i);
+		system(cmd);
+		sprintf(cmd, "ifconfig eth0.%d up", vlan_id);
+		system(cmd);
+	}
+	*/
+	
+}
+
+
+
+void bsp_vlan_qinq_config_test1()
+{
+	EX_D(rtk_svlan_init());
+	EX_D(rtk_svlan_tpidEntry_set(0x88a8));
+
+	EX_D(rtk_svlan_servicePort_add(UTP_PORT1));
+	//EX_D(rtk_svlan_servicePort_add(UTP_PORT2));
+
+	rtk_svlan_memberCfg_t svlanCfg;
+
+	memset(&svlanCfg, 0x00, sizeof(rtk_svlan_memberCfg_t));
+	svlanCfg.svid = 10;
+	svlanCfg.fid = 0;
+	svlanCfg.priority = 0;
+	RTK_PORTMASK_PORT_SET(svlanCfg.memberport, UTP_PORT0);
+	RTK_PORTMASK_PORT_SET(svlanCfg.memberport, UTP_PORT1);
+	RTK_PORTMASK_PORT_SET(svlanCfg.untagport, UTP_PORT0);
+	EX_D(rtk_svlan_memberPortEntry_set(10, &svlanCfg));
+	EX_D(rtk_svlan_defaultSvlan_set(UTP_PORT0, 10));
+
+	memset(&svlanCfg, 0x00, sizeof(rtk_svlan_memberCfg_t));
+	svlanCfg.svid = 12;
+	svlanCfg.fid = 0;
+	svlanCfg.priority = 0;
+	RTK_PORTMASK_PORT_SET(svlanCfg.memberport, UTP_PORT2);
+	RTK_PORTMASK_PORT_SET(svlanCfg.memberport, UTP_PORT1);
+	RTK_PORTMASK_PORT_SET(svlanCfg.untagport, UTP_PORT2);
+	EX_D(rtk_svlan_memberPortEntry_set(12, &svlanCfg));
+	EX_D(rtk_svlan_defaultSvlan_set(UTP_PORT2, 12));
+
+}
+
+void bsp_vlan_qinq_config()
+{
+	EX_D(rtk_svlan_init());
+	EX_D(rtk_svlan_tpidEntry_set(0x8100));
+
+	EX_D(rtk_svlan_servicePort_add(EXT_PORT0));
+
+	rtk_svlan_memberCfg_t svlanCfg;
+
+	memset(&svlanCfg, 0x00, sizeof(rtk_svlan_memberCfg_t));
+	svlanCfg.svid = 100;
+	svlanCfg.fid = 0;
+	svlanCfg.priority = 0;
+	RTK_PORTMASK_PORT_SET(svlanCfg.memberport, UTP_PORT0);
+	RTK_PORTMASK_PORT_SET(svlanCfg.memberport, EXT_PORT0);
+	RTK_PORTMASK_PORT_SET(svlanCfg.untagport, UTP_PORT0);
+	EX_D(rtk_svlan_memberPortEntry_set(100, &svlanCfg));
+	EX_D(rtk_svlan_defaultSvlan_set(UTP_PORT0, 100));
+
+	memset(&svlanCfg, 0x00, sizeof(rtk_svlan_memberCfg_t));
+	svlanCfg.svid = 101;
+	svlanCfg.fid = 0;
+	svlanCfg.priority = 0;
+	RTK_PORTMASK_PORT_SET(svlanCfg.memberport, UTP_PORT1);
+	RTK_PORTMASK_PORT_SET(svlanCfg.memberport, EXT_PORT0);
+	RTK_PORTMASK_PORT_SET(svlanCfg.untagport, UTP_PORT1);
+	EX_D(rtk_svlan_memberPortEntry_set(101, &svlanCfg));
+	EX_D(rtk_svlan_defaultSvlan_set(UTP_PORT1, 101));
+
+	memset(&svlanCfg, 0x00, sizeof(rtk_svlan_memberCfg_t));
+	svlanCfg.svid = 102;
+	svlanCfg.fid = 0;
+	svlanCfg.priority = 0;
+	RTK_PORTMASK_PORT_SET(svlanCfg.memberport, UTP_PORT2);
+	RTK_PORTMASK_PORT_SET(svlanCfg.memberport, EXT_PORT0);
+	RTK_PORTMASK_PORT_SET(svlanCfg.untagport, UTP_PORT2);
+	EX_D(rtk_svlan_memberPortEntry_set(102, &svlanCfg));
+	EX_D(rtk_svlan_defaultSvlan_set(UTP_PORT2, 102));
+
+	memset(&svlanCfg, 0x00, sizeof(rtk_svlan_memberCfg_t));
+	svlanCfg.svid = 103;
+	svlanCfg.fid = 0;
+	svlanCfg.priority = 0;
+	RTK_PORTMASK_PORT_SET(svlanCfg.memberport, UTP_PORT3);
+	RTK_PORTMASK_PORT_SET(svlanCfg.memberport, EXT_PORT0);
+	RTK_PORTMASK_PORT_SET(svlanCfg.untagport, UTP_PORT3);
+	EX_D(rtk_svlan_memberPortEntry_set(103, &svlanCfg));
+	EX_D(rtk_svlan_defaultSvlan_set(UTP_PORT3, 103));
+
+}
+
+
+int bsp_l2table_show()
+{
+	rtk_uint32 address = 0;
+	rtk_l2_ucastAddr_t l2_data;
+	rtk_api_ret_t ret;
+
+	while (1){
+		if ((ret = rtk_l2_addr_next_get(READMETHOD_NEXT_L2UC, UTP_PORT0, &address, &l2_data))){
+			break;
+		}
+		printf(PX_MAC" %d %d %d\n", PS_MAC(&(l2_data.mac)), l2_data.ivl, l2_data.cvid, l2_data.port);
+		address++;
+	}
+}
+
+int bsp_l2table_clear()
+{
+	rtk_uint32 address = 0;
+	rtk_l2_ucastAddr_t l2_data;
+	rtk_api_ret_t ret;
+
+	while (1){
+		if ((ret = rtk_l2_addr_next_get(READMETHOD_NEXT_L2UC, UTP_PORT0, &address, &l2_data))){
+			break;
+		}
+		rtk_l2_addr_del(&(l2_data.mac), &l2_data);
+		//printf(PX_MAC" %d %d %d\n", PS_MAC(&(l2_data.mac)), l2_data.ivl, l2_data.cvid, l2_data.port);
+		address++;
+	}
+}
+
+void bsp_ports_info()
+{
+	int i = 0;
+	rtk_port_linkStatus_t linkStatus;
+	rtk_port_speed_t speed;
+	rtk_port_duplex_t duplex;
+	char *linkStatus_str[] = { "DOWN", "  UP" };
+	char *speed_str[] = { "  10M", " 100M", "1000M" };
+	char *duplex_str[] = { "HALF_DUPLEX ", "FULL_DUPLEX" };
+
+	rtk_port_t ports[5] = { UTP_PORT0, UTP_PORT1, UTP_PORT2, UTP_PORT3, EXT_PORT0};
+
+	for (i = 0; i < 4; i++){
+		rtk_port_phyStatus_get(ports[i], &linkStatus, &speed, &duplex);
+		ilog_info("[Port%d] %s   %s   %s", ports[i], linkStatus_str[linkStatus], speed_str[speed], duplex_str[duplex]);
+	}
+
+	ilog_info("-------------------------------------------------------------");
+	ilog_info("port Octets   UcastPkts MulticastPkts BroadcastPkts");
+	for (i = 0; i < 5; i++){
+		rtk_stat_counter_t InOctets;;
+		rtk_stat_counter_t InUcastPkts;
+		rtk_stat_counter_t InMulticastPkts;
+		rtk_stat_counter_t InBroadcastPkts;
+		rtk_stat_counter_t OutOctets;
+		rtk_stat_counter_t OutUcastPkts;
+		rtk_stat_counter_t OutMulticastPkts;
+		rtk_stat_counter_t OutBroadcastPkts;
+		rtk_stat_port_get(ports[i], ifInOctets, &InOctets);
+		rtk_stat_port_get(ports[i], ifInUcastPkts, &InUcastPkts);
+		rtk_stat_port_get(ports[i], ifInMulticastPkts, &InMulticastPkts);
+		rtk_stat_port_get(ports[i], ifInBroadcastPkts, &InBroadcastPkts);
+		//rtk_stat_port_get(ports[i], ifOutOctets, &OutOctets);
+		//rtk_stat_port_get(ports[i], ifOutUcastPkts, &OutUcastPkts);
+		//rtk_stat_port_get(ports[i], ifOutMulticastPkts, &OutMulticastPkts);
+		//rtk_stat_port_get(ports[i], ifOutBroadcastPkts, &OutBroadcastPkts);
+		ilog_info("[Port%d] Rx %12llu %12llu %12llu %12llu", ports[i],
+			InOctets, InUcastPkts, InMulticastPkts, InBroadcastPkts);
+		//ilog_info("[Port%d] Tx %12llu %12llu %12llu %12llu", ports[i],
+		//	OutOctets, OutUcastPkts, OutMulticastPkts, OutBroadcastPkts);
+	}
+
+	
+
+
+
+}
+
+void bsp_info()
+{
+	unsigned int addr = 0x1b03;
+	unsigned int data = 0;
+	smi_read(addr, &data);
+	ilog_info("Reg[%x] Val: %x", addr, data);
+}
+
+void help()
+{
+	ilog_info("isolate");
+	ilog_info("l2forward");
+	ilog_info("info");
+}
+
+int main(int argc, char **argv)
+{
+	ilog_init();
+	ilog_parser_init();
+
+	rtk_switch_init();
+	rtk_l2_init();
+	if (argc == 2){
+		char * cmd = argv[1];
+
+		if (strcmp(cmd, "help") == 0){
+			help();
+		}else if (strcmp(cmd, "isolate") == 0){
+			bsp_vlans_isolate();
+		}else if (strcmp(cmd, "isolate2") == 0){
+			bsp_vlan_qinq_config();
+		}else if (strcmp(cmd, "l2forward") == 0){
+			bsp_vlans_l2forward();
+		}else if (strcmp(cmd, "info") == 0){
+			bsp_info();
+			bsp_ports_info();
+			bsp_l2table_show();
+		}else{
+			help();
+		}
+
+		return 0;
+	}
+
+	
+
+	help();
+	icall_shell(argv[0], NULL);
+	while (1) {
+		sleep(1);
+	}
+	return 0;
+}
+
