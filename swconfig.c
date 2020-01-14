@@ -12,15 +12,14 @@
 #include <rtl8367c_asicdrv_mib.h>
 #include <l2.h>
 
-#define EX_D(expr)												  \
-    {    														  \
-        if (!(expr)) {											  \
-            printf("[ OK ] ["#expr"]\n");					      \
-        } else { 												  \
-            printf("[Fail] ["#expr"]\n");  					  \
-																  \
-        } 														  \
-    }
+#define EX_D(expr)  \
+{   \
+    if (!(expr)) {  \
+        printf("[ OK ] ["#expr"]\n");   \
+    } else {    \
+        printf("[Fail] ["#expr"]\n");   \
+    }   \
+}
 
 #define PX_MAC		"%02x:%02x:%02x:%02x:%02x:%02x"
 #define PS_MAC(mac) (unsigned char)((unsigned char *)mac)[0],(unsigned char)((unsigned char *)mac)[1],\
