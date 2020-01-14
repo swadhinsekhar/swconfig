@@ -21,13 +21,13 @@
     }   \
 }
 
-#define PX_MAC		    "%02x:%02x:%02x:%02x:%02x:%02x"
+#define PX_MAC          "%02x:%02x:%02x:%02x:%02x:%02x"
 #define PS_MAC(mac)     (unsigned char)((unsigned char *)mac)[0],(unsigned char)((unsigned char *)mac)[1],  \
                         (unsigned char)((unsigned char *)mac)[2],(unsigned char)((unsigned char *)mac)[3],  \
                         (unsigned char)((unsigned char *)mac)[4], (unsigned char)((unsigned char *)mac)[5]
 
-#define PX_IP		    "%d.%d.%d.%d"
-#define PS_IP(ip)	    (unsigned char)((unsigned char *)&(ip))[0],(unsigned char)((unsigned char *)&(ip))[1],  \
+#define PX_IP           "%d.%d.%d.%d"
+#define PS_IP(ip)       (unsigned char)((unsigned char *)&(ip))[0],(unsigned char)((unsigned char *)&(ip))[1],  \
                         (unsigned char)((unsigned char *)&(ip))[2],(unsigned char)((unsigned char *)&(ip))[3]
 
 void bsp_vlans_l2forward()
@@ -139,7 +139,6 @@ void bsp_vlan_qinq_config()
     EX_D(rtk_svlan_memberPortEntry_set(103, &svlanCfg));
     EX_D(rtk_svlan_defaultSvlan_set(UTP_PORT3, 103));
 }
-
 
 void  bsp_l2table_show()
 {
