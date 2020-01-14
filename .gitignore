@@ -36,3 +36,4 @@ deployment.plan
 terraform.tfstate*
 tags
 *.out
+swconfig

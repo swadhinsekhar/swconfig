@@ -1,29 +1,35 @@
+#include <stdlib.h>
+#include <string.h>
+
 #include <rtk_error.h>
 #include <rtk_types.h>
-#include <port.h>
 #include <rtk_switch.h>
+#include <port.h>
 #include <smi.h>
 #include <stat.h>
 #include <vlan.h>
 #include <svlan.h>
 #include <rtl8367c_asicdrv_mib.h>
-#include <stdlib.h>
-#include <string.h>
 #include <l2.h>
-#include "iutil.h"
-#include "assert.h"
-#include "icall.h"
-
 
 #define EX_D(expr)												  \
     {    														  \
         if (!(expr)) {											  \
-            ilog_info("[ OK ] ["#expr"]");					      \
+            printf("[ OK ] ["#expr"]\n");					      \
         } else { 												  \
-            ilog_error("[Fail] ["#expr"]");  					  \
+            printf("[Fail] ["#expr"]\n");  					  \
 																  \
         } 														  \
     }
+
+#define PX_MAC		"%02x:%02x:%02x:%02x:%02x:%02x"
+#define PS_MAC(mac) (unsigned char)((unsigned char *)mac)[0],(unsigned char)((unsigned char *)mac)[1],\
+                    (unsigned char)((unsigned char *)mac)[2],(unsigned char)((unsigned char *)mac)[3],\
+                    (unsigned char)((unsigned char *)mac)[4], (unsigned char)((unsigned char *)mac)[5]
+
+#define PX_IP		"%d.%d.%d.%d"
+#define PS_IP(ip)	(unsigned char)((unsigned char *)&(ip))[0],(unsigned char)((unsigned char *)&(ip))[1],\
+                    (unsigned char)((unsigned char *)&(ip))[2],(unsigned char)((unsigned char *)&(ip))[3]
 
 void bsp_vlans_l2forward()
 {
@@ -32,13 +38,15 @@ void bsp_vlans_l2forward()
 
 void bsp_vlans_isolate()
 {
+	int             i = 0;
+	rtk_vlan_cfg_t  vlan_cfg;
+	rtk_vlan_t      vlan_id;
+	rtk_port_t      port;
+
 	rtk_vlan_init();
-	int i = 0;
-	rtk_vlan_cfg_t vlan_cfg;
-	rtk_vlan_t vlan_id;
-	rtk_port_t port;
-	char cmd[256];
+
 	rtk_port_t ports_out[2] = { UTP_PORT0, UTP_PORT2};
+
 	for (i = 0; i < 2; i++){
 		port = ports_out[i];
 		vlan_id = 100 + port;
@@ -51,8 +59,6 @@ void bsp_vlans_isolate()
 		rtk_vlan_portPvid_set(port, vlan_id, 0);
 	}
 }
-
-
 
 void bsp_vlan_qinq_config_test1()
 {
@@ -83,7 +89,6 @@ void bsp_vlan_qinq_config_test1()
 	RTK_PORTMASK_PORT_SET(svlanCfg.untagport, UTP_PORT2);
 	EX_D(rtk_svlan_memberPortEntry_set(12, &svlanCfg));
 	EX_D(rtk_svlan_defaultSvlan_set(UTP_PORT2, 12));
-
 }
 
 void bsp_vlan_qinq_config()
@@ -134,11 +139,10 @@ void bsp_vlan_qinq_config()
 	RTK_PORTMASK_PORT_SET(svlanCfg.untagport, UTP_PORT3);
 	EX_D(rtk_svlan_memberPortEntry_set(103, &svlanCfg));
 	EX_D(rtk_svlan_defaultSvlan_set(UTP_PORT3, 103));
-
 }
 
 
-int bsp_l2table_show()
+void  bsp_l2table_show()
 {
 	rtk_uint32          address = 0;
 	rtk_l2_ucastAddr_t  l2_data;
@@ -149,14 +153,14 @@ int bsp_l2table_show()
                     UTP_PORT0, &address, &l2_data))) {
 			break;
 		}
-		printf(PX_MAC" %d %d %d\n",
+		printf(PX_MAC" %d %d %d \n",
             PS_MAC(&(l2_data.mac)), l2_data.ivl,
             l2_data.cvid, l2_data.port);
 		address++;
 	}
 }
 
-int bsp_l2table_clear()
+void bsp_l2table_clear()
 {
 	rtk_uint32 address = 0;
 	rtk_l2_ucastAddr_t l2_data;
@@ -167,26 +171,28 @@ int bsp_l2table_clear()
 			break;
 		}
 		rtk_l2_addr_del(&(l2_data.mac), &l2_data);
-		//printf(PX_MAC" %d %d %d\n", PS_MAC(&(l2_data.mac)), l2_data.ivl, l2_data.cvid, l2_data.port);
+		printf(PX_MAC" %d %d %d\n",
+            PS_MAC(&(l2_data.mac)),
+            l2_data.ivl, l2_data.cvid, l2_data.port);
 		address++;
 	}
 }
 
 void bsp_ports_status()
 {
-	int i = 0;
-	rtk_port_linkStatus_t linkStatus;
-	rtk_port_speed_t speed;
-	rtk_port_duplex_t duplex;
-	char *linkStatus_str[] = { "DOWN", "  UP" };
-	char *speed_str[] = { "  10M", " 100M", "1000M" };
-	char *duplex_str[] = { "HALF_DUPLEX ", "FULL_DUPLEX" };
+	int                     i = 0;
+	rtk_port_linkStatus_t   linkStatus;
+	rtk_port_speed_t        speed;
+	rtk_port_duplex_t       duplex;
+	char                    *linkStatus_str[] = { "DOWN", "  UP" };
+	char                    *speed_str[] = { "  10M", " 100M", "1000M" };
+	char                    *duplex_str[] = { "HALF_DUPLEX ", "FULL_DUPLEX" };
 
 	rtk_port_t ports[5] = { UTP_PORT0, UTP_PORT1, UTP_PORT2, UTP_PORT3, EXT_PORT0};
 
 	for (i = 0; i < 4; i++) {
 		rtk_port_phyStatus_get(ports[i], &linkStatus, &speed, &duplex);
-		ilog_info("[port%d] %s   %s   %s",
+		printf("[port%d] %s   %s   %s \n",
             ports[i], linkStatus_str[linkStatus],
             speed_str[speed], duplex_str[duplex]);
 	}
@@ -214,18 +220,17 @@ rtk_port_t get_swport(char *swport)
 
 void bsp_switch_ports_status(char *swport)
 {
-	int i = 0;
-	rtk_port_linkStatus_t linkStatus;
-	rtk_port_speed_t speed;
-	rtk_port_duplex_t duplex;
-	char *linkStatus_str[] = { "DOWN", "  UP" };
-	char *speed_str[] = { "  10M", " 100M", "1000M" };
-	char *duplex_str[] = { "HALF_DUPLEX ", "FULL_DUPLEX" };
+	rtk_port_linkStatus_t   linkStatus;
+	rtk_port_speed_t        speed;
+	rtk_port_duplex_t       duplex;
+	char                    *linkStatus_str[] = { "DOWN", "  UP" };
+	char                    *speed_str[] = { "  10M", " 100M", "1000M" };
+	char                    *duplex_str[] = { "HALF_DUPLEX ", "FULL_DUPLEX" };
 
 	rtk_port_t ports = get_swport(swport);
     if(RTK_PORT_MAX != ports) {
 		rtk_port_phyStatus_get(ports, &linkStatus, &speed, &duplex);
-		ilog_info("[%s] %s   %s   %s",
+		printf("[%s] %s   %s   %s \n",
             swport, linkStatus_str[linkStatus],
             speed_str[speed], duplex_str[duplex]);
     } else {
@@ -238,8 +243,8 @@ void bsp_ports_info()
 	int         i = 0;
 	rtk_port_t  ports[5] = { UTP_PORT0, UTP_PORT1, UTP_PORT2, UTP_PORT3, EXT_PORT0};
 
-	ilog_info("-------------------------------------------------------------");
-	ilog_info("port   TX/RX     Octets      UcastPkts   MulticastPkts   BroadcastPkts");
+	printf("------------------------------------------------------------- \n");
+	printf("port   TX/RX     Octets      UcastPkts   MulticastPkts   BroadcastPkts \n");
 	for (i = 0; i < 4; i++) {
 		rtk_stat_counter_t InOctets;;
 		rtk_stat_counter_t InUcastPkts;
@@ -254,14 +259,14 @@ void bsp_ports_info()
 		rtk_stat_port_get(ports[i], ifInUcastPkts, &InUcastPkts);
 		rtk_stat_port_get(ports[i], ifInMulticastPkts, &InMulticastPkts);
 		rtk_stat_port_get(ports[i], ifInBroadcastPkts, &InBroadcastPkts);
-		ilog_info("[port%d] Rx %12llu %12llu %12llu %12llu", ports[i],
+	    printf("[port%d] Rx %12llu %12llu %12llu %12llu \n", ports[i],
 			InOctets, InUcastPkts, InMulticastPkts, InBroadcastPkts);
 
 		rtk_stat_port_get(ports[i], ifOutOctets, &OutOctets);
 		rtk_stat_port_get(ports[i], ifOutUcastPkts, &OutUcastPkts);
 		rtk_stat_port_get(ports[i], ifOutMulticastPkts, &OutMulticastPkts);
 		rtk_stat_port_get(ports[i], ifOutBroadcastPkts, &OutBroadcastPkts);
-		ilog_info("[Port%d] Tx %12llu %12llu %12llu %12llu", ports[i],
+		printf("[Port%d] Tx %12llu %12llu %12llu %12llu \n", ports[i],
 			OutOctets, OutUcastPkts, OutMulticastPkts, OutBroadcastPkts);
 	}
 }
@@ -270,26 +275,24 @@ void bsp_info()
 {
 	unsigned int addr = 0x1b03;
 	unsigned int data = 0;
+
 	smi_read(addr, &data);
-	ilog_info("Reg[%x] Val: %x", addr, data);
+	printf("Reg[%x] Val: %x \n", addr, data);
 }
 
 void help()
 {
-	//ilog_info("isolate");
-	//ilog_info("l2forward");
-	ilog_info("isolate2");
-	ilog_info("port-status");
-	ilog_info("port-status portX");
-	ilog_info("arp-show");
-	ilog_info("info");
+	//printf("isolate");
+	//printf("l2forward");
+	printf("isolate2\n");
+	printf("port-status\n");
+	printf("port-status portX\n");
+	printf("arp-show\n");
+	printf("info\n");
 }
 
 int main(int argc, char **argv)
 {
-	ilog_init();
-	ilog_parser_init();
-
 	rtk_switch_init();
 	rtk_l2_init();
 
@@ -325,7 +328,6 @@ int main(int argc, char **argv)
 		char *cmd2 = argv[2];
 
         if((NULL != cmd1) && (NULL != cmd2)) {
-            printf("argv[1] : %s argv[2] : %s\n", argv[1], argv[2]);
 		    if (!strcmp(cmd1, "port-status")) {
                 bsp_switch_ports_status(cmd2);
                 return 0;
@@ -334,6 +336,7 @@ int main(int argc, char **argv)
     }
 
 	help();
+
 	return 0;
 }
 
